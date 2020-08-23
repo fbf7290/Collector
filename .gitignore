@@ -1,0 +1,11 @@
+# Project exclude paths
+/collector-api/target/
+/collector-api/target/scala-2.12/classes/
+/collector-impl/target/
+/collector-impl/target/scala-2.12/classes/
+/project/project/target/
+/project/target/
+/target/
+/target/lagom-dynamic-projects/lagom-internal-meta-project-cassandra/target/
+/target/lagom-dynamic-projects/lagom-internal-meta-project-kafka/target/
+/target/lagom-dynamic-projects/lagom-internal-meta-project-service-locator/target/
