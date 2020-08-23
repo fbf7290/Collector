@@ -13,9 +13,11 @@ val jsoup = "org.jsoup" % "jsoup" % "1.8.2"
 val yahooFinance = "com.yahoofinance-api" % "YahooFinanceAPI" % "3.15.0"
 val akkaDiscoveryKubernetesApi = "com.lightbend.akka.discovery" %% "akka-discovery-kubernetes-api" % "1.0.3"
 val lagomScaladslAkkaDiscovery = "com.lightbend.lagom" %% "lagom-scaladsl-akka-discovery-service-locator" % LagomVersion.current
+val cats = "org.typelevel" %% "cats-core" % "2.1.1"
 
 
-ThisBuild / scalacOptions ++= List("-encoding", "utf8", "-deprecation", "-feature", "-unchecked", "-Xfatal-warnings")
+
+ThisBuild / scalacOptions ++= List("-encoding", "utf8", "-deprecation", "-feature", "-unchecked", "-Xfatal-warnings", "-language:higherKinds", "-Ypartial-unification")
 
 def dockerSettings = Seq(
   dockerBaseImage := "adoptopenjdk/openjdk8"
@@ -39,6 +41,7 @@ lazy val collectorImpl = (project in file("collector-impl"))
       macwire,
       yahooFinance,
       jsoup,
+      cats,
       lagomScaladslAkkaDiscovery,
       akkaDiscoveryKubernetesApi,
       lagomScaladslPersistenceCassandra
