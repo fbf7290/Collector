@@ -32,9 +32,9 @@ trait CollectorService extends Service{
         restCall(Method.GET, "/stock/usa", getUsaStockList),
         restCall(Method.GET, "/stock/korea1", storeKoreaStock),
 
-        restCall(Method.GET, "/collect/korea/etf/stockList", getKoreaEtfStockList),
-        restCall(Method.GET, "/collect/korea/kospi/stockList", getKospiStockList),
-        restCall(Method.GET, "/collect/korea/kosdaq/stockList", getKosdaqStockList),
+        restCall(Method.GET, "/stock/korea/etf/stockList", getKoreaEtfStockList),
+        restCall(Method.GET, "/stock/korea/kospi/stockList", getKospiStockList),
+        restCall(Method.GET, "/stock/korea/kosdaq/stockList", getKosdaqStockList),
       ).withAutoAcl(true)
       .withExceptionSerializer(new ClientExceptionSerializer(Environment.simple()))
 

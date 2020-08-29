@@ -1,6 +1,7 @@
 package com.asset.collector.impl
 
 import java.util.Calendar
+
 import akka.actor.ActorSystem
 import akka.{Done, NotUsed}
 import akka.util.Timeout
@@ -14,14 +15,17 @@ import org.jsoup.Jsoup
 import play.api.libs.ws.WSClient
 import yahoofinance.YahooFinance
 import yahoofinance.histquotes.Interval
+
 import collection.JavaConverters._
-import scala.collection.mutable.{ListBuffer}
+import scala.collection.mutable.ListBuffer
 import scala.concurrent.{ExecutionContext, Future}
 import cats.instances.future._
+import com.asset.collector.api.Exception.ExternalResourceException
 import com.asset.collector.api.Market.Market
 import com.asset.collector.impl.repo.price.{PriceRepo, PriceRepoAccessor}
 import com.lightbend.lagom.internal.persistence.cluster.ClusterStartupTask
-import play.api.libs.json.{Json}
+import play.api.libs.json.Json
+
 import scala.concurrent.duration._
 
 
@@ -99,7 +103,7 @@ class CollectorServiceImpl(val system: ActorSystem, val wsClient: WSClient, val 
     Future.successful(ResponseHeader.Ok.withStatus(200),Done)
   }
 
-  override def getKoreaEtfStockList: ServiceCall[NotUsed, Seq[Stock]] = ServerServiceCall{ (_, _) =>
+  private def requestKoreaEtfStockList:Future[Seq[Stock]] = {
     var stockList = ListBuffer.empty[Stock]
     wsClient.url("https://finance.naver.com/api/sise/etfItemList.nhn").get().map{
       response =>
@@ -107,13 +111,19 @@ class CollectorServiceImpl(val system: ActorSystem, val wsClient: WSClient, val 
         (naverEtfListResponse.resultCode=="success") match {
           case true =>
             stockList ++= naverEtfListResponse.result.etfItemList.map(etf => Stock(Market.KOSPI, etf.itemname, etf.itemcode))
-            (ResponseHeader.Ok.withStatus(200), stockList.toSeq)
-          case false => (ResponseHeader.Ok.withStatus(400), Seq.empty)
-         }
+            stockList.toSeq
+          case false => throw ExternalResourceException
+        }
     }
   }
 
-  private def requestKoreaMarketStock(market: Market):Future[List[Stock]]= {
+  override def getKoreaEtfStockList: ServiceCall[NotUsed, Seq[Stock]] = ServerServiceCall{ (_, _) =>
+    requestKoreaEtfStockList.map{ stockList =>
+      (ResponseHeader.Ok.withStatus(200),stockList)
+    }
+  }
+
+  private def requestKoreaMarketStockList(market: Market):Future[List[Stock]]= {
     var stockList = ListBuffer.empty[Stock]
     val marketParam = if(market == Market.KOSDAQ) "kosdaqMkt" else if(market == Market.KOSPI) "stockMkt"
     wsClient.url(s"http://kind.krx.co.kr/corpgeneral/corpList.do?method=download&searchType=13&marketType=${marketParam}").get().map{
@@ -124,17 +134,17 @@ class CollectorServiceImpl(val system: ActorSystem, val wsClient: WSClient, val 
           if(stockAttrs.size != 0) stockList += Stock(market, stockAttrs(0).text, stockAttrs(1).text)
         }
         stockList.toList
-    }
+    }.recover{case _ => throw ExternalResourceException}
   }
 
   override def getKospiStockList: ServiceCall[NotUsed, Seq[Stock]] = ServerServiceCall { (_, _) =>
-    requestKoreaMarketStock(Market.KOSPI).map{ stockList =>
+    requestKoreaMarketStockList(Market.KOSPI).map{ stockList =>
       (ResponseHeader.Ok.withStatus(200),stockList)
     }
   }
 
   override def getKosdaqStockList: ServiceCall[NotUsed, Seq[Stock]] = ServerServiceCall { (_, _) =>
-    requestKoreaMarketStock(Market.KOSDAQ).map{ stockList =>
+    requestKoreaMarketStockList(Market.KOSDAQ).map{ stockList =>
       (ResponseHeader.Ok.withStatus(200),stockList)
     }
   }
