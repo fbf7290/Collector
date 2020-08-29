@@ -9,5 +9,6 @@ import com.asset.collector.api.Stock
 trait StockRepoTrait[F[_]] {
   def createStockTable(country:Country):F[Done]
   def selectStocks(country: Country):F[Seq[Stock]]
-  def insertStock(country: Country, code: String, name: String, market: Market):F[Done]
+  def insertStock(country: Country, stock:Stock):F[Done]
+  def insertBatchStock(country: Country, stocks:Seq[Stock]):F[Done]
 }

@@ -4,9 +4,9 @@ import akka.Done
 import com.asset.collector.api.Country.Country
 import com.asset.collector.api.{Market, Stock}
 import com.lightbend.lagom.scaladsl.persistence.cassandra.CassandraSession
-import com.asset.collector.api.Market.Market
-
+import com.datastax.driver.core.BatchStatement
 import scala.concurrent.{ExecutionContext, Future}
+
 
 
 case class StockRepo(session: CassandraSession)(implicit val  ec: ExecutionContext) extends StockRepoTrait[Future]{
@@ -18,6 +18,23 @@ case class StockRepo(session: CassandraSession)(implicit val  ec: ExecutionConte
       rows.map(row => Stock(Market.toMarket(row.getString("market")).get, row.getString("name"), row.getString("code")))
     }
 
-  override def insertStock(country: Country, code: String, name: String, market: Market): Future[Done] =
-    session.executeWrite(s"INSERT INTO ${country}_stock (ignored, code, name, market) VALUES ('1', '${code}', '${name}', '${market}')")
+  override def insertStock(country: Country, stock:Stock): Future[Done] =
+    session.executeWrite(s"INSERT INTO ${country}_stock (ignored, code, name, market) VALUES ('1', '${stock.code}', '${stock.name}', '${stock.market}')")
+
+  override def insertBatchStock(country: Country, stocks: Seq[Stock]): Future[Done] =
+    for {
+      stmt <- session.prepare(s"INSERT INTO ${country}_stock (ignored, code, name, market) VALUES ('1', ?, ?)")
+      batch = new BatchStatement
+      _ = stocks.map { stock =>
+        batch.add(stmt.bind
+        .setString("code", stock.code)
+        .setString("name", stock.name)
+        .setString("market", stock.market.toString))
+      }
+      r <- session.executeWriteBatch(batch)
+    } yield {
+      r
+    }
+
+
 }

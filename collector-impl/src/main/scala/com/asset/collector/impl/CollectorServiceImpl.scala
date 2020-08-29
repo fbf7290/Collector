@@ -1,26 +1,42 @@
 package com.asset.collector.impl
 
-import java.io.{BufferedReader, InputStreamReader}
-import java.net.URL
 import java.util.Calendar
-
+import akka.actor.ActorSystem
 import akka.{Done, NotUsed}
 import akka.util.Timeout
-import com.asset.collector.api.CollectorService
+import com.asset.collector.api.{CollectorService, Country, Market, NaverEtfListResponse, Stock}
+import com.asset.collector.impl.repo.stock.{StockRepo, StockRepoAccessor}
 import com.lightbend.lagom.scaladsl.api.ServiceCall
 import com.lightbend.lagom.scaladsl.api.transport.ResponseHeader
+import com.lightbend.lagom.scaladsl.persistence.cassandra.CassandraSession
 import com.lightbend.lagom.scaladsl.server.ServerServiceCall
 import org.jsoup.Jsoup
 import play.api.libs.ws.WSClient
-import yahoofinance.{Stock, YahooFinance}
+import yahoofinance.YahooFinance
 import yahoofinance.histquotes.Interval
-
 import collection.JavaConverters._
-import scala.collection.mutable.ArrayBuffer
+import scala.collection.mutable.{ListBuffer}
 import scala.concurrent.{ExecutionContext, Future}
+import cats.instances.future._
+import com.asset.collector.api.Market.Market
+import com.asset.collector.impl.repo.price.{PriceRepo, PriceRepoAccessor}
+import com.lightbend.lagom.internal.persistence.cluster.ClusterStartupTask
+import play.api.libs.json.{Json}
+import scala.concurrent.duration._
 
-class CollectorServiceImpl(val wsClient: WSClient)
+
+class CollectorServiceImpl(val system: ActorSystem, val wsClient: WSClient, val cassandraSession: CassandraSession)
       (implicit protected val  ec: ExecutionContext, implicit protected val timeout:Timeout) extends CollectorService{
+
+  val stockDb = StockRepo(cassandraSession)
+  val priceDb = PriceRepo(cassandraSession)
+
+  ClusterStartupTask(system, "Init", ()=> {
+    (StockRepoAccessor.createStockTable(Country.KOREA).run(stockDb) zip
+     StockRepoAccessor.createStockTable(Country.USA).run(stockDb) zip
+      PriceRepoAccessor.createPriceTable(Country.KOREA).run(priceDb) zip
+      PriceRepoAccessor.createPriceTable(Country.USA).run(priceDb)).map(_=>Done)
+  }, 60.seconds, None, 3.seconds, 30.seconds, 0.2)
 
   override def getKoreaPrice: ServiceCall[NotUsed, Done] =
     ServerServiceCall { (requestHeader, _) =>
@@ -46,7 +62,6 @@ class CollectorServiceImpl(val wsClient: WSClient)
 
   override def getKoreaEtfList: ServiceCall[NotUsed, Done] =
     ServerServiceCall { (requestHeader, _) =>
-
       wsClient.url("https://finance.naver.com/api/sise/etfItemList.nhn").get().map{
         response =>
           println(response.body)
@@ -55,30 +70,72 @@ class CollectorServiceImpl(val wsClient: WSClient)
     }
 
   override def getKoreaStockList: ServiceCall[NotUsed, Done] =
-
     ServerServiceCall { (requestHeader, _) =>
 //http://old.nasdaq.com/screening/companies-by-name.aspx?letter=0&render=download&exchange=NYSE  AMEX  NASDAQ
-      wsClient.url("http://kind.krx.co.kr/corpgeneral/corpList.do?method=download&searchType=13&marketType=kosdaqMkt").get().map{
+      wsClient.url("http://kind.krx.co.kr/corpgeneral/corpList.do?method=download&searchType=13&marketType=kospiMkt").get().map{
         response =>
           val a = Jsoup.parseBodyFragment(response.body).body().getElementsByTag("tr")
           for(d <- a.asScala){
-            val c = d.getElementsByTag("td")
-            for(b <- c.asScala){
+            val c = d.getElementsByTag("td").asScala
+//            if(c.size != 0) println(s"${c(0).text} ${c(1).text}")
+            for(b <- c){
               println(b.text())
             }
           }
-
           (ResponseHeader.Ok.withStatus(200),Done)
       }
     }
 
   override def getUsaStockList: ServiceCall[NotUsed, Done] =
     ServerServiceCall { (requestHeader, _) =>
-
       wsClient.url("https://dumbstockapi.com/stock?exchanges=NYSE").get.map{
         response =>
           println(response.body)
           (ResponseHeader.Ok.withStatus(200),Done)
       }
     }
+
+  override def storeKoreaStock: ServiceCall[NotUsed, Done] = ServerServiceCall{ (_, _) =>
+    Future.successful(ResponseHeader.Ok.withStatus(200),Done)
+  }
+
+  override def getKoreaEtfStockList: ServiceCall[NotUsed, Seq[Stock]] = ServerServiceCall{ (_, _) =>
+    var stockList = ListBuffer.empty[Stock]
+    wsClient.url("https://finance.naver.com/api/sise/etfItemList.nhn").get().map{
+      response =>
+        val naverEtfListResponse = Json.parse(response.body).as[NaverEtfListResponse]
+        (naverEtfListResponse.resultCode=="success") match {
+          case true =>
+            stockList ++= naverEtfListResponse.result.etfItemList.map(etf => Stock(Market.KOSPI, etf.itemname, etf.itemcode))
+            (ResponseHeader.Ok.withStatus(200), stockList.toSeq)
+          case false => (ResponseHeader.Ok.withStatus(400), Seq.empty)
+         }
+    }
+  }
+
+  private def requestKoreaMarketStock(market: Market):Future[List[Stock]]= {
+    var stockList = ListBuffer.empty[Stock]
+    val marketParam = if(market == Market.KOSDAQ) "kosdaqMkt" else if(market == Market.KOSPI) "stockMkt"
+    wsClient.url(s"http://kind.krx.co.kr/corpgeneral/corpList.do?method=download&searchType=13&marketType=${marketParam}").get().map{
+      response =>
+        val stocks = Jsoup.parseBodyFragment(response.body).body().getElementsByTag("tr")
+        for(stock <- stocks.asScala){
+          val stockAttrs = stock.getElementsByTag("td").asScala
+          if(stockAttrs.size != 0) stockList += Stock(market, stockAttrs(0).text, stockAttrs(1).text)
+        }
+        stockList.toList
+    }
+  }
+
+  override def getKospiStockList: ServiceCall[NotUsed, Seq[Stock]] = ServerServiceCall { (_, _) =>
+    requestKoreaMarketStock(Market.KOSPI).map{ stockList =>
+      (ResponseHeader.Ok.withStatus(200),stockList)
+    }
+  }
+
+  override def getKosdaqStockList: ServiceCall[NotUsed, Seq[Stock]] = ServerServiceCall { (_, _) =>
+    requestKoreaMarketStock(Market.KOSDAQ).map{ stockList =>
+      (ResponseHeader.Ok.withStatus(200),stockList)
+    }
+  }
 }

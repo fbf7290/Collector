@@ -42,7 +42,21 @@ object Market extends Enumeration {
 }
 
 
-case class Stock(market:Market, name:String, code:String)
+case class Stock(market:Market, name:String, code:String){
+  override def canEqual(a: Any) = a.isInstanceOf[Stock]
+
+  override def equals(that: Any): Boolean =
+    that match {
+      case that: Stock =>
+        that.canEqual(this) && this.hashCode == that.hashCode
+      case _ => false
+    }
+
+  override def hashCode:Int = {
+    code.hashCode
+  }
+
+}
 object Stock {
   implicit val format :Format[Stock]= Json.format
 }

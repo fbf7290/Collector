@@ -19,8 +19,8 @@ object StockRepoAccessor {
       db => db.selectStocks(country)
     }
 
-  def insertStock[F[_]:Monad](country: Country, code: String, name: String, market: Market):ReaderT[F, StockRepoTrait[F], Done] =
+  def insertStock[F[_]:Monad](country: Country, stock:Stock):ReaderT[F, StockRepoTrait[F], Done] =
     ReaderT[F, StockRepoTrait[F], Done] {
-      db => db.insertStock(country, code, name, market)
+      db => db.insertStock(country, stock)
     }
 }
