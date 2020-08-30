@@ -22,6 +22,16 @@ curl  http://localhost:9000/stock/korea/kospi/stockList
 ```
 
 
+## ****코스닥 전체 주식 이름 및 종목 코드****
+```
+curl  http://localhost:9000/stock/korea/kosdaq/stockList
+
+[[{"market":"kosdaq","name":"CJ프레시웨이","code":"051500"},
+    {"market":"kosdaq","name":"EDGC","code":"245620"},
+    {"market":"kosdaq","name":"GST","code":"083450"}... ] ```
+```
+
+
 
 ## ****한국 전체 ETF 이름 및 종목 코드****
 ```
