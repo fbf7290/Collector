@@ -26,6 +26,10 @@ import com.asset.collector.impl.acl.External
 import com.asset.collector.impl.repo.price.{PriceRepo, PriceRepoAccessor}
 import com.lightbend.lagom.internal.persistence.cluster.ClusterStartupTask
 import play.api.libs.json.Json
+import akka.actor.typed.scaladsl.adapter._
+import com.asset.collector.impl.actor.BatchActor
+import akka.actor.typed.scaladsl.AskPattern._
+
 
 import scala.concurrent.duration._
 
@@ -34,9 +38,12 @@ class CollectorServiceImpl(val system: ActorSystem, val wsClient: WSClient, val 
       (implicit protected val  ec: ExecutionContext, implicit protected val timeout:Timeout) extends CollectorService{
 
   implicit val wsC = wsClient
+  implicit  val typedSystem = system.toTyped
 
   val stockDb = StockRepo(cassandraSession)
   val priceDb = PriceRepo(cassandraSession)
+
+  val batchActor = system.spawn(BatchActor(stockDb), "batchActor")
 
   ClusterStartupTask(system, "Init", ()=> {
     (StockRepoAccessor.createStockTable(Country.KOREA).run(stockDb) zip
@@ -124,5 +131,8 @@ class CollectorServiceImpl(val system: ActorSystem, val wsClient: WSClient, val 
     }
   }
 
-
+  override def requestBatchKoreaStock: ServiceCall[NotUsed, Done] = ServerServiceCall { (_, _) =>
+    batchActor.ask[BatchActor.Reply.type](reply => BatchActor.CollectKoreaStock(Some(reply)))
+      .map(_=>(ResponseHeader.Ok.withStatus(200),Done))
+  }
 }

@@ -23,7 +23,7 @@ case class StockRepo(session: CassandraSession)(implicit val  ec: ExecutionConte
 
   override def insertBatchStock(country: Country, stocks: Seq[Stock]): Future[Done] =
     for {
-      stmt <- session.prepare(s"INSERT INTO ${country}_stock (ignored, code, name, market) VALUES ('1', ?, ?)")
+      stmt <- session.prepare(s"INSERT INTO ${country}_stock (ignored, code, name, market) VALUES ('1', ?, ?, ?)")
       batch = new BatchStatement
       _ = stocks.map { stock =>
         batch.add(stmt.bind
@@ -36,5 +36,7 @@ case class StockRepo(session: CassandraSession)(implicit val  ec: ExecutionConte
       r
     }
 
+  override def deleteStock(country: Country, stock: Stock): Future[Done] =
+    session.executeWrite(s"DELETE FROM ${country}_stock where ignored='1' and code='${stock.code}'")
 
 }

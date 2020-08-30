@@ -19,6 +19,8 @@ trait CollectorService extends Service{
   def getKospiStockList: ServiceCall[NotUsed, Seq[Stock]]
   def getKosdaqStockList: ServiceCall[NotUsed, Seq[Stock]]
 
+  def requestBatchKoreaStock: ServiceCall[NotUsed, Done]
+
 
   override def descriptor: Descriptor ={
     import Service._
@@ -35,6 +37,8 @@ trait CollectorService extends Service{
         restCall(Method.GET, "/stock/korea/etf/stockList", getKoreaEtfStockList),
         restCall(Method.GET, "/stock/korea/kospi/stockList", getKospiStockList),
         restCall(Method.GET, "/stock/korea/kosdaq/stockList", getKosdaqStockList),
+
+        restCall(Method.POST, "/stock/korea/batch", requestBatchKoreaStock)
       ).withAutoAcl(true)
       .withExceptionSerializer(new ClientExceptionSerializer(Environment.simple()))
 

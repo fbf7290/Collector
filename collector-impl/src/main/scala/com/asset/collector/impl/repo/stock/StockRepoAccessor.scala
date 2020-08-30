@@ -23,4 +23,14 @@ object StockRepoAccessor {
     ReaderT[F, StockRepoTrait[F], Done] {
       db => db.insertStock(country, stock)
     }
+
+  def insertBatchStock[F[_]:Monad](country: Country, stocks: Seq[Stock]):ReaderT[F, StockRepoTrait[F], Done] =
+    ReaderT[F, StockRepoTrait[F], Done] {
+      db => db.insertBatchStock(country, stocks)
+    }
+
+  def deleteStock[F[_]:Monad](country: Country, stock:Stock):ReaderT[F, StockRepoTrait[F], Done] =
+    ReaderT[F, StockRepoTrait[F], Done] {
+      db => db.deleteStock(country, stock)
+    }
 }

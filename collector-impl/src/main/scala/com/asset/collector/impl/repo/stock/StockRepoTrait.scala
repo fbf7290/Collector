@@ -11,4 +11,5 @@ trait StockRepoTrait[F[_]] {
   def selectStocks(country: Country):F[Seq[Stock]]
   def insertStock(country: Country, stock:Stock):F[Done]
   def insertBatchStock(country: Country, stocks:Seq[Stock]):F[Done]
+  def deleteStock(country: Country, stock:Stock):F[Done]
 }
