@@ -24,10 +24,11 @@ trait CollectorService extends Service{
   def getAmexStockList: ServiceCall[NotUsed, Seq[Stock]]
 
   def requestBatchKoreaStock: ServiceCall[NotUsed, Done]
-
+  def requestBatchUsaStock: ServiceCall[NotUsed, Done]
 
   override def descriptor: Descriptor ={
     import Service._
+
 
     named("Collector")
       .withCalls(
@@ -47,7 +48,8 @@ trait CollectorService extends Service{
         restCall(Method.GET, "/stock/usa/nyse/stockList", getNyseStockList),
         restCall(Method.GET, "/stock/usa/amex/stockList", getAmexStockList),
 
-        restCall(Method.POST, "/stock/korea/batch", requestBatchKoreaStock)
+        restCall(Method.POST, "/stock/korea/batch", requestBatchKoreaStock),
+        restCall(Method.POST, "/stock/usa/batch", requestBatchUsaStock)
       ).withAutoAcl(true)
       .withExceptionSerializer(new ClientExceptionSerializer(Environment.simple()))
 

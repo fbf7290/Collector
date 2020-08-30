@@ -3,6 +3,7 @@ package com.asset.collector.impl.actor
 import java.time.temporal.ChronoUnit
 import java.time.{ZoneId, ZonedDateTime}
 
+import akka.Done
 import akka.actor.typed.{ActorRef, Behavior, SupervisorStrategy}
 import akka.actor.typed.scaladsl.Behaviors
 import com.asset.collector.api.{Country, Market, Stock}
@@ -11,11 +12,13 @@ import play.api.libs.ws.WSClient
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration._
-import cats.instances.future._
 import com.asset.collector.api.Country.Country
 import com.asset.collector.impl.acl.External
-
+//import cats.implicits._
 import scala.util.{Failure, Success}
+import cats.syntax.traverse._
+import cats.instances.future._
+import cats.instances.list._
 
 object BatchActor {
   sealed trait Command
@@ -39,21 +42,28 @@ object BatchActor {
             timers.startSingleTimer(msg, msg, (after.toEpochSecond - now.toEpochSecond).seconds)
           }
 
+          def refreshStockList(country: Country, nowStocks:Set[Stock]) =
+            for {
+              stocks <- StockRepoAccessor.selectStocks[Future](country).map(_.toSet)
+              _ <- StockRepoAccessor.insertBatchStock[Future](country, (nowStocks -- stocks).toSeq)
+              _ <-  (stocks -- nowStocks).map(stock => StockRepoAccessor.deleteStock[Future](country, stock)).toList.sequence
+            } yield {}
+
+
           setDailyTimer(CollectKoreaStock(None), 0)
           setDailyTimer(CollectUsaStock(None), 8)
+
 
           def ing:Behavior[Command] = Behaviors.receiveMessage {
             case CollectKoreaStock(replyTo) =>
               replyTo.map(_.tell(Reply))
               context.pipeToSelf {
-                for {
-                  stocks <- StockRepoAccessor.selectStocks(Country.KOREA).run(stockDb).map(_.toSet)
-                  nowStocksList <- Future.sequence(List(External.requestKoreaEtfStockList,
+                for{
+                  nowStocksList <- Future.sequence(Set(External.requestKoreaEtfStockList,
                     External.requestKoreaMarketStockList(Market.KOSPI),
                     External.requestKoreaMarketStockList(Market.KOSDAQ)))
-                  nowStocks = nowStocksList.foldLeft(Set.empty[Stock])((r, stocks) => r ++ stocks.toSet)
-                  _ <- StockRepoAccessor.insertBatchStock(Country.KOREA, (nowStocks -- stocks).toSeq).run(stockDb)
-                  _ <- Future.sequence((stocks -- nowStocks).map(stock => StockRepoAccessor.deleteStock(Country.KOREA, stock).run(stockDb)))
+                  nowStocks = nowStocksList.foldLeft(Set.empty[Stock])((r, stocks) => r ++ stocks)
+                  _ <- refreshStockList(Country.KOREA, nowStocks).run(stockDb)
                 } yield {}
               }{
                 case Success(_) => SuccessBatch(Country.KOREA)
@@ -62,13 +72,26 @@ object BatchActor {
               stash
             case CollectUsaStock(replyTo) =>
               replyTo.map(_.tell(Reply))
-              Behaviors.same
+              context.pipeToSelf {
+                for{
+                  nowStocksList <- Future.sequence(Set(External.requestUsaMarketStockList(Market.NASDAQ),
+                    External.requestUsaMarketStockList(Market.NYSE),
+                    External.requestUsaMarketStockList(Market.AMEX)))
+                  nowStocks = nowStocksList.foldLeft(Set.empty[Stock])((r, stocks) => r ++ stocks)
+                  _ <- refreshStockList(Country.USA, nowStocks).run(stockDb)
+                } yield {}
+              }{
+                case Success(_) => SuccessBatch(Country.USA)
+                case Failure(exception) => throw exception
+              }
+              stash
             case _ =>
               Behaviors.same
           }
 
           def stash:Behavior[Command] = Behaviors.receiveMessage {
             case SuccessBatch(country) =>
+              println("finish")
               country match {
                 case Country.KOREA => setDailyTimer(CollectKoreaStock(None), 0)
                 case Country.USA => setDailyTimer(CollectUsaStock(None), 8)

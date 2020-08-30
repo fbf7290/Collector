@@ -153,4 +153,9 @@ class CollectorServiceImpl(val system: ActorSystem, val wsClient: WSClient, val 
       (ResponseHeader.Ok.withStatus(200),stockList)
     }
   }
+
+  override def requestBatchUsaStock: ServiceCall[NotUsed, Done] = ServerServiceCall { (_, _) =>
+    batchActor.ask[BatchActor.Reply.type](reply => BatchActor.CollectUsaStock(Some(reply)))
+      .map(_=>(ResponseHeader.Ok.withStatus(200),Done))
+  }
 }
