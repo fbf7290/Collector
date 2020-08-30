@@ -61,7 +61,7 @@ object Stock {
   implicit val format :Format[Stock]= Json.format
 }
 
-case class Price(code:String, timestamp:Long, close:Int, open:Int, high:Int, low:Int)
+case class Price(code:String, date:Int, close:Int, open:Int, high:Int, low:Int, volume:Long)
 object Price {
   implicit val format :Format[Price]= Json.format
 }

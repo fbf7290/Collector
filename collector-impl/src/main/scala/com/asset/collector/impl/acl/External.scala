@@ -2,7 +2,7 @@ package com.asset.collector.impl.acl
 
 import com.asset.collector.api.Exception.ExternalResourceException
 import com.asset.collector.api.Market.Market
-import com.asset.collector.api.{DumbStock, Market, NaverEtfListResponse, Stock}
+import com.asset.collector.api.{DumbStock, Market, NaverEtfListResponse, Price, Stock}
 import org.jsoup.Jsoup
 import play.api.libs.json.Json
 import play.api.libs.ws.WSClient
@@ -56,4 +56,12 @@ object External {
         stockList.toSeq
     }.recover{case _ => throw ExternalResourceException}
   }
+
+  def requestKoreaStockPrice(code:String, count:Int=Int.MaxValue)(implicit wsClient: WSClient, ec: ExecutionContext):Future[Seq[Price]] =
+    wsClient.url("https://fchart.stock.naver.com/sise.nhn?timeframe=day&count=10000000&requestType=0&symbol=005930").get().map{
+      response =>
+        val pattern = new scala.util.matching.Regex("<item data=\\\"(.*)\\\" />")
+        pattern.findAllIn(response.body).matchData.map(_.group(1).split('|')).filter(_.size==6)
+          .map(arr => Price(code, arr(0).toInt, arr(4).toInt, arr(1).toInt, arr(2).toInt, arr(3).toInt, arr(5).toLong)).toSeq
+    }
 }

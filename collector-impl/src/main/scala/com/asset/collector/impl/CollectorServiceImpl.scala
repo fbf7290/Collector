@@ -5,7 +5,7 @@ import java.util.Calendar
 import akka.actor.ActorSystem
 import akka.{Done, NotUsed}
 import akka.util.Timeout
-import com.asset.collector.api.{CollectorService, Country, Market, NaverEtfListResponse, Stock}
+import com.asset.collector.api.{CollectorService, Country, Market, NaverEtfListResponse, Price, Stock}
 import com.asset.collector.impl.repo.stock.{StockRepo, StockRepoAccessor}
 import com.lightbend.lagom.scaladsl.api.ServiceCall
 import com.lightbend.lagom.scaladsl.api.transport.ResponseHeader
@@ -23,13 +23,11 @@ import cats.instances.future._
 import com.asset.collector.api.Exception.ExternalResourceException
 import com.asset.collector.api.Market.Market
 import com.asset.collector.impl.acl.External
-import com.asset.collector.impl.repo.price.{PriceRepo, PriceRepoAccessor}
 import com.lightbend.lagom.internal.persistence.cluster.ClusterStartupTask
 import play.api.libs.json.Json
 import akka.actor.typed.scaladsl.adapter._
 import com.asset.collector.impl.actor.BatchActor
 import akka.actor.typed.scaladsl.AskPattern._
-
 
 import scala.concurrent.duration._
 
@@ -41,27 +39,35 @@ class CollectorServiceImpl(val system: ActorSystem, val wsClient: WSClient, val 
   implicit  val typedSystem = system.toTyped
 
   val stockDb = StockRepo(cassandraSession)
-  val priceDb = PriceRepo(cassandraSession)
 
   val batchActor = system.spawn(BatchActor(stockDb), "batchActor")
 
   ClusterStartupTask(system, "Init", ()=> {
     (StockRepoAccessor.createStockTable(Country.KOREA).run(stockDb) zip
      StockRepoAccessor.createStockTable(Country.USA).run(stockDb) zip
-      PriceRepoAccessor.createPriceTable(Country.KOREA).run(priceDb) zip
-      PriceRepoAccessor.createPriceTable(Country.USA).run(priceDb)).map(_=>Done)
+      StockRepoAccessor.createPriceTable(Country.KOREA).run(stockDb) zip
+      StockRepoAccessor.createPriceTable(Country.USA).run(stockDb)).map(_=>Done)
   }, 60.seconds, None, 3.seconds, 30.seconds, 0.2)
 
   override def getKoreaPrice: ServiceCall[NotUsed, Done] =
     ServerServiceCall { (requestHeader, _) =>
       val pattern1 = new scala.util.matching.Regex("<item data=\\\"(.*)\\\" />")
-
-      wsClient.url("https://fchart.stock.naver.com/sise.nhn?timeframe=day&count=10000000&requestType=0&symbol=005930").get().map{
-        response =>
-          val result = pattern1.findAllIn(response.body).matchData.map(_.group(1)).toList
-          println(result)
+      External.requestKoreaStockPrice("005930", 3).map{
+        a =>
+          println(a)
           (ResponseHeader.Ok.withStatus(200),Done)
       }
+//      wsClient.url("https://fchart.stock.naver.com/sise.nhn?timeframe=day&count=10000000&requestType=0&symbol=005930").get().map{
+//        response =>
+//          val result = pattern1.findAllIn(response.body).matchData.map(_.group(1)).toList
+//          result.map{
+//            s =>
+//              val a = s.split('|')
+//              if(a.size==6) println(Price("005930", a(0).toInt, a(4).toInt, a(1).toInt, a(2).toInt, a(3).toInt, a(5).toLong))
+//          }
+//
+//          (ResponseHeader.Ok.withStatus(200),Done)
+//      }
     }
 
   override def getUsaPrice: ServiceCall[NotUsed, Done] =
@@ -70,7 +76,9 @@ class CollectorServiceImpl(val system: ActorSystem, val wsClient: WSClient, val 
       val from = Calendar.getInstance()
       from.add(Calendar.YEAR, -5)
       // ^KS11(코스피), ^KQ11(코스닥), ^IXIC(나스닥), ^DJI(다우존스), ^GSPC(S&P500),
-      println(YahooFinance.get("USDKRW=X", from, to, Interval.DAILY))
+//      println(YahooFinance.get("USDKRW=X", from, to, Interval.DAILY))
+//      println(YahooFinance.get("QQQ", from, to, Interval.DAILY).getDividendHistory)
+      println(YahooFinance.get("CLR", from, to, Interval.DAILY).getDividendHistory)
       Future.successful(ResponseHeader.Ok.withStatus(200),Done)
     }
 
