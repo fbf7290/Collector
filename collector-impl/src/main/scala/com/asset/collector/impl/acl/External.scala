@@ -2,12 +2,12 @@ package com.asset.collector.impl.acl
 
 import com.asset.collector.api.Exception.ExternalResourceException
 import com.asset.collector.api.Market.Market
-import com.asset.collector.api.{Market, NaverEtfListResponse, Stock}
+import com.asset.collector.api.{DumbStock, Market, NaverEtfListResponse, Stock}
 import org.jsoup.Jsoup
 import play.api.libs.json.Json
 import play.api.libs.ws.WSClient
-import collection.JavaConverters._
 
+import collection.JavaConverters._
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -28,7 +28,7 @@ object External {
   }
 
 
-  def requestKoreaMarketStockList(market: Market)(implicit wsClient: WSClient, ec: ExecutionContext):Future[List[Stock]]= {
+  def requestKoreaMarketStockList(market: Market)(implicit wsClient: WSClient, ec: ExecutionContext):Future[Seq[Stock]]= {
     var stockList = ListBuffer.empty[Stock]
     val marketParam = if(market == Market.KOSDAQ) "kosdaqMkt" else if(market == Market.KOSPI) "stockMkt"
     wsClient.url(s"http://kind.krx.co.kr/corpgeneral/corpList.do?method=download&searchType=13&marketType=${marketParam}").get().map{
@@ -42,4 +42,18 @@ object External {
     }.recover{case _ => throw ExternalResourceException}
   }
 
+  def requestUsaMarketStockList(market:Market)(implicit wsClient: WSClient, ec: ExecutionContext):Future[Seq[Stock]] = {
+    var stockList = ListBuffer.empty[Stock]
+    val marketParam = market match {
+      case Market.NASDAQ => "NASDAQ"
+      case Market.NYSE => "NYSE"
+      case Market.AMEX => "AMEX"
+    }
+    wsClient.url(s"https://dumbstockapi.com/stock?exchanges=${marketParam}").get.map{
+      response =>
+        Json.parse(response.body).as[Seq[DumbStock]].foreach(dumbStock => stockList += Stock(market, dumbStock.name, dumbStock.ticker))
+        println(response.body)
+        stockList.toSeq
+    }.recover{case _ => throw ExternalResourceException}
+  }
 }

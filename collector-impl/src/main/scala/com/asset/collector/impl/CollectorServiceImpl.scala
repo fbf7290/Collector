@@ -135,4 +135,22 @@ class CollectorServiceImpl(val system: ActorSystem, val wsClient: WSClient, val 
     batchActor.ask[BatchActor.Reply.type](reply => BatchActor.CollectKoreaStock(Some(reply)))
       .map(_=>(ResponseHeader.Ok.withStatus(200),Done))
   }
+
+  override def getNasdaqStockList: ServiceCall[NotUsed, Seq[Stock]] = ServerServiceCall { (_, _) =>
+    External.requestUsaMarketStockList(Market.NASDAQ).map{ stockList =>
+      (ResponseHeader.Ok.withStatus(200),stockList)
+    }
+  }
+
+  override def getNyseStockList: ServiceCall[NotUsed, Seq[Stock]] = ServerServiceCall { (_, _) =>
+    External.requestUsaMarketStockList(Market.NYSE).map{ stockList =>
+      (ResponseHeader.Ok.withStatus(200),stockList)
+    }
+  }
+
+  override def getAmexStockList: ServiceCall[NotUsed, Seq[Stock]] = ServerServiceCall { (_, _) =>
+    External.requestUsaMarketStockList(Market.AMEX).map{ stockList =>
+      (ResponseHeader.Ok.withStatus(200),stockList)
+    }
+  }
 }
