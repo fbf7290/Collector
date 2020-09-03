@@ -8,16 +8,15 @@ import play.api.Environment
 
 trait CollectorService extends Service{
 
-  def getKoreaPrice: ServiceCall[NotUsed, Done]
   def getUsaPrice: ServiceCall[NotUsed, Done]
   def getKoreaEtfList: ServiceCall[NotUsed, Done]
   def getKoreaStockList: ServiceCall[NotUsed, Done]
   def getUsaStockList: ServiceCall[NotUsed, Done]
 
-  def storeKoreaStock: ServiceCall[NotUsed, Done]
   def getKoreaEtfStockList: ServiceCall[NotUsed, Seq[Stock]]
   def getKospiStockList: ServiceCall[NotUsed, Seq[Stock]]
   def getKosdaqStockList: ServiceCall[NotUsed, Seq[Stock]]
+  def getKoreaStockPrices(code:String): ServiceCall[NotUsed, Seq[Price]]
 
   def getNasdaqStockList: ServiceCall[NotUsed, Seq[Stock]]
   def getNyseStockList: ServiceCall[NotUsed, Seq[Stock]]
@@ -32,16 +31,15 @@ trait CollectorService extends Service{
 
     named("Collector")
       .withCalls(
-        restCall(Method.GET, "/price/korea", getKoreaPrice),
         restCall(Method.GET, "/price/usa", getUsaPrice),
         restCall(Method.GET, "/etf/korea", getKoreaEtfList),
         restCall(Method.GET, "/stock/korea", getKoreaStockList),
         restCall(Method.GET, "/stock/usa", getUsaStockList),
-        restCall(Method.GET, "/stock/korea1", storeKoreaStock),
 
         restCall(Method.GET, "/stock/korea/etf/stockList", getKoreaEtfStockList),
         restCall(Method.GET, "/stock/korea/kospi/stockList", getKospiStockList),
         restCall(Method.GET, "/stock/korea/kosdaq/stockList", getKosdaqStockList),
+        restCall(Method.GET, "/stock/korea/prices/:code", getKoreaStockPrices _),
 
 
         restCall(Method.GET, "/stock/usa/nasdaq/stockList", getNasdaqStockList),

@@ -5,7 +5,7 @@
 사용 기술 : Scala, Cats, Akka, Lagom, Cassandra
 
 Cassandra 실행 : docker run --name asset-cassandra -v /Users/wonryool/Desktop/Source/asset\ portfolio/Cassandra:/var/lib/cassandra -p 9042:9042 -d cassandra
-
+설정할 환경 변수 : FCM_PROJECT_KEY, ADMIN_FCM_ID
 메일 : rladnjsfbf@gmail.com
 
 
@@ -45,6 +45,38 @@ curl  http://localhost:9000/stock/korea/etf/stockList
     {"market":"kospi","name":"KODEX 레버리지","code":"122630"},
     {"market":"kospi", "name":"KODEX 단기채권","code":"153130"}, ...] 
 ```
+
+
+## ****한국 주식 일봉 가격 정보****
+```
+curl  http://localhost:9000/stock/korea/prices/:종목코드
+    Ex. curl http://localhost:9000/stock/korea/prices/005930
+
+[
+    {
+        "code": "005930",
+        "date": 19900103,
+        "close": 44800,
+        "open": 44000,
+        "high": 45000,
+        "low": 43200,
+        "volume": 26240
+    }
+    ... , 
+    {
+      "code": "005930",
+      "date": 20200831,
+      "close": 54000,
+      "open": 56000,
+      "high": 56100,
+      "low": 54000,
+      "volume": 31686567
+    }
+]
+```
+
+
+
 
 
 

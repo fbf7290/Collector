@@ -58,10 +58,10 @@ object External {
   }
 
   def requestKoreaStockPrice(code:String, count:Int=Int.MaxValue)(implicit wsClient: WSClient, ec: ExecutionContext):Future[Seq[Price]] =
-    wsClient.url("https://fchart.stock.naver.com/sise.nhn?timeframe=day&count=10000000&requestType=0&symbol=005930").get().map{
+    wsClient.url(s"https://fchart.stock.naver.com/sise.nhn?timeframe=day&count=${count}&requestType=0&symbol=${code}").get().map{
       response =>
         val pattern = new scala.util.matching.Regex("<item data=\\\"(.*)\\\" />")
-        pattern.findAllIn(response.body).matchData.map(_.group(1).split('|')).filter(_.size==6)
+        pattern.findAllIn(response.body).matchData.map(_.group(1).split('|')).toList.filter(_.size==6)
           .map(arr => Price(code, arr(0).toInt, arr(4).toInt, arr(1).toInt, arr(2).toInt, arr(3).toInt, arr(5).toLong)).toSeq
     }
 }

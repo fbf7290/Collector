@@ -50,7 +50,7 @@ case class StockRepo(session: CassandraSession)(implicit val  ec: ExecutionConte
   override def insertPrice(country:Country, price: Price): Future[Done] =
     session.executeWrite(s"INSERT INTO ${country}_price (code, date, close, open, low, high, volume) VALUES ('${price.code}', ${price.date}, ${price.close}, ${price.open}, ${price.low}, ${price.high}, ${price.volume}")
 
-  override def insertBatchPrice(country: Country, prices: Seq[Price]): Future[Done] =
+  override def insertBatchPrice(country: Country, prices: Seq[Price]): Future[Done] = {
     for {
       stmt <- session.prepare(s"INSERT INTO ${country}_price (code, date, close, open, low, high, volume) VALUES (?, ?, ?, ?, ?, ?, ?)")
       batch = new BatchStatement
@@ -59,13 +59,14 @@ case class StockRepo(session: CassandraSession)(implicit val  ec: ExecutionConte
           .setString("code", price.code)
           .setInt("date", price.date)
           .setInt("close", price.close)
-          .setInt("open", price.close)
-          .setInt("low", price.close)
-          .setInt("high", price.close)
-          .setLong("volume", price.close))
+          .setInt("open", price.open)
+          .setInt("low", price.low)
+          .setInt("high", price.high)
+          .setLong("volume", price.volume))
       }
       r <- session.executeWriteBatch(batch)
     } yield {
       r
     }
+  }
 }
