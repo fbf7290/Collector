@@ -1,18 +1,23 @@
 package com.asset.collector.impl.acl
 
+import java.text.SimpleDateFormat
+import java.util.Calendar
+
 import com.asset.collector.api.Exception.ExternalResourceException
 import com.asset.collector.api.Market.Market
 import com.asset.collector.api.{DumbStock, Market, NaverEtfListResponse, Price, Stock}
 import org.jsoup.Jsoup
 import play.api.libs.json.Json
 import play.api.libs.ws.WSClient
+import yahoofinance.YahooFinance
+import yahoofinance.histquotes.Interval
 
 import collection.JavaConverters._
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.{ExecutionContext, Future}
 
 object External {
-
+//TODO price의 int를 float로 바꾼다.
   def requestKoreaEtfStockList(implicit wsClient: WSClient, ec: ExecutionContext):Future[Seq[Stock]] = {
     var stockList = ListBuffer.empty[Stock]
     wsClient.url("https://finance.naver.com/api/sise/etfItemList.nhn").get().map{
@@ -63,5 +68,16 @@ object External {
         val pattern = new scala.util.matching.Regex("<item data=\\\"(.*)\\\" />")
         pattern.findAllIn(response.body).matchData.map(_.group(1).split('|')).toList.filter(_.size==6)
           .map(arr => Price(code, arr(0).toInt, arr(4).toInt, arr(1).toInt, arr(2).toInt, arr(3).toInt, arr(5).toLong)).toSeq
+    }
+
+  def requestUsaStockPrice(code:String, year:Int=30)(implicit ec: ExecutionContext):Future[Seq[Price]] =
+    Future{
+      val from = Calendar.getInstance()
+      from.add(Calendar.YEAR, -1*year)
+      val format = new SimpleDateFormat("yyyyMMdd")
+      YahooFinance.get(code, from, Interval.DAILY).getHistory.asScala.map{
+        stock =>
+          Price(code, format.format(stock.getDate.getTime()).toInt, stock.getClose.intValue, stock.getOpen.intValue, stock.getHigh.intValue, stock.getLow.intValue, stock.getVolume)
+      }
     }
 }

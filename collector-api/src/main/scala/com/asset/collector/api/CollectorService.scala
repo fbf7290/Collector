@@ -21,6 +21,7 @@ trait CollectorService extends Service{
   def getNasdaqStockList: ServiceCall[NotUsed, Seq[Stock]]
   def getNyseStockList: ServiceCall[NotUsed, Seq[Stock]]
   def getAmexStockList: ServiceCall[NotUsed, Seq[Stock]]
+  def getUsaStockPrices(code:String): ServiceCall[NotUsed, Seq[Price]]
 
   def requestBatchKoreaStock: ServiceCall[NotUsed, Done]
   def requestBatchUsaStock: ServiceCall[NotUsed, Done]
@@ -45,6 +46,7 @@ trait CollectorService extends Service{
         restCall(Method.GET, "/stock/usa/nasdaq/stockList", getNasdaqStockList),
         restCall(Method.GET, "/stock/usa/nyse/stockList", getNyseStockList),
         restCall(Method.GET, "/stock/usa/amex/stockList", getAmexStockList),
+        restCall(Method.GET, "/stock/usa/prices/:code", getUsaStockPrices _),
 
         restCall(Method.POST, "/stock/korea/batch", requestBatchKoreaStock),
         restCall(Method.POST, "/stock/usa/batch", requestBatchUsaStock)

@@ -70,7 +70,7 @@ object BatchActor {
                   nowStocks = nowStocksList.foldLeft(Set.empty[Stock])((r, stocks) => r ++ stocks)
                   _ <- refreshStockList(Country.KOREA, nowStocks).run(stockDb)
                 } yield {
-                  Source(nowStocks.take(3)).mapAsync(8){stock =>
+                  Source(nowStocks).mapAsync(8){stock =>
                     println(stock)
                     External.requestKoreaStockPrice(stock.code).flatMap{ prices =>
                       StockRepoAccessor.insertBatchPrice[Future](Country.KOREA, prices).run(stockDb)
@@ -94,7 +94,17 @@ object BatchActor {
                     External.requestUsaMarketStockList(Market.AMEX)))
                   nowStocks = nowStocksList.foldLeft(Set.empty[Stock])((r, stocks) => r ++ stocks)
                   _ <- refreshStockList(Country.USA, nowStocks).run(stockDb)
-                } yield {}
+                } yield {
+                  Source(nowStocks).mapAsync(8){stock =>
+                    println(stock)
+                    External.requestUsaStockPrice(stock.code).flatMap{ prices =>
+                      StockRepoAccessor.insertBatchPrice[Future](Country.USA, prices).run(stockDb)
+                    }
+                  }.runWith(Sink.ignore).onComplete{
+                    case Success(_) => Fcm.sendFcmMsg(List(CollectorSettings.adminFcmRegistrationId), FcmMessage("미국 batch 성공", "1", JsNull))
+                    case Failure(exception) => Fcm.sendFcmMsg(List(CollectorSettings.adminFcmRegistrationId), FcmMessage("미국 batch 성공", exception.getMessage, JsNull))
+                  }
+                }
               }{
                 case Success(_) => SuccessStockListBatch(Country.USA)
                 case Failure(exception) => throw exception

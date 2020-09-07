@@ -55,11 +55,16 @@ class CollectorServiceImpl(val system: ActorSystem, val wsClient: WSClient, val 
     ServerServiceCall { (requestHeader, _) =>
       val to = Calendar.getInstance();
       val from = Calendar.getInstance()
-      from.add(Calendar.YEAR, -30)
+      from.add(Calendar.YEAR, -10)
       // ^KS11(코스피), ^KQ11(코스닥), ^IXIC(나스닥), ^DJI(다우존스), ^GSPC(S&P500),
       //      println(YahooFinance.get("USDKRW=X", from, to, Interval.DAILY))
       //      println(YahooFinance.get("QQQ", from, to, Interval.DAILY).getDividendHistory)
-      println(YahooFinance.get("TSLA", from, Interval.DAILY).getHistory.get(0).getAdjClose)
+//      println(YahooFinance.get("005930.KS", from, Interval.DAILY).getHistory.get(0).getAdjClose)
+
+      YahooFinance.get("005930.KS", from, Interval.DAILY).getHistory.asScala.foreach{
+        st => println(s"${st.getDate}_${st.getClose}_${st.getAdjClose}")
+      }
+
       Future.successful(ResponseHeader.Ok.withStatus(200), Done)
     }
 
@@ -143,6 +148,12 @@ class CollectorServiceImpl(val system: ActorSystem, val wsClient: WSClient, val 
 
   override def getAmexStockList: ServiceCall[NotUsed, Seq[Stock]] = ServerServiceCall { (_, _) =>
     External.requestUsaMarketStockList(Market.AMEX).map{ stockList =>
+      (ResponseHeader.Ok.withStatus(200),stockList)
+    }
+  }
+
+  override def getUsaStockPrices(code: String): ServiceCall[NotUsed, Seq[Price]] = ServerServiceCall { (_, _) =>
+    External.requestUsaStockPrice(code).map{ stockList =>
       (ResponseHeader.Ok.withStatus(200),stockList)
     }
   }
