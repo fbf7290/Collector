@@ -1,4 +1,4 @@
-**현재 개발 진행 중 (2020.08 ~)**
+**개발 1차 완료  (2020.08 ~ 2020.09)**
 
 # **Stock Collector : 미국/한국 주식시장 주식  수집기**
 
@@ -7,6 +7,7 @@
 Cassandra 실행 : docker run --name asset-cassandra -v /Users/wonryool/Desktop/Source/asset\ portfolio/Cassandra:/var/lib/cassandra -p 9042:9042 -d cassandra
 
 설정할 환경 변수 : FCM_PROJECT_KEY, ADMIN_FCM_ID
+
 메일 : rladnjsfbf@gmail.com
 
 
