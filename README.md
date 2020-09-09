@@ -113,7 +113,7 @@ curl  http://localhost:9000/stock/usa/amex/stockList
 
 
 
-## ****한국 주식 일봉 가격 정보****
+## ****미국 주식 일봉 가격 정보****
 ```
 curl  http://localhost:9000/stock/usa/prices/:ticker
     Ex. curl http://localhost:9000/stock/usa/prices/tsla
