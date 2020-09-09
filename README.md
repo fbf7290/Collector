@@ -113,3 +113,39 @@ curl  http://localhost:9000/stock/usa/amex/stockList
 
 
 
+## ****한국 주식 일봉 가격 정보****
+```
+curl  http://localhost:9000/stock/usa/prices/:ticker
+    Ex. curl http://localhost:9000/stock/usa/prices/tsla
+
+[
+    {
+        "code": "tsla",
+        "date": "20100629",
+        "close": "4.778000",
+        "open": "3.800000",
+        "high": "5.000000",
+        "low": "3.508000",
+        "volume": "93831500"
+    },
+    {
+        "code": "tsla",
+        "date": "20100630",
+        "close": "4.766000",
+        "open": "5.158000",
+        "high": "6.084000",
+        "low": "4.660000",
+        "volume": "85935500"
+    },
+    ...,
+   {
+       "code": "tsla",
+       "date": "20200908",
+       "close": "330.209991",
+       "open": "356.000000",
+       "high": "368.739990",
+       "low": "329.880005",
+       "volume": "113168200"
+   }
+]
+```
