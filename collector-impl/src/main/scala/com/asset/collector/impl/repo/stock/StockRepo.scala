@@ -42,10 +42,10 @@ case class StockRepo(session: CassandraSession)(implicit val  ec: ExecutionConte
     session.executeWrite(s"DELETE FROM ${country}_stock where ignored='1' and code='${stock.code}'")
 
   override def createPriceTable(country: Country): Future[Done] =
-    session.executeCreateTable(s"create table if not exists ${country}_price (code TEXT, date INT, close INT, open INT, low INT, high INT, volume BIGINT, PRIMARY KEY(code, date)) WITH CLUSTERING ORDER BY (date DESC)")
+    session.executeCreateTable(s"create table if not exists ${country}_price (code TEXT, date TEXT, close TEXT, open TEXT, low TEXT, high TEXT, volume TEXT, PRIMARY KEY(code, date)) WITH CLUSTERING ORDER BY (date DESC)")
 
-  override def selectLatestTimestamp(country: Country, code: String): Future[Option[Int]] =
-    session.selectOne(s"select date from ${country}_price where code='${code}").map(_.map(_.getInt("data")))
+  override def selectLatestTimestamp(country: Country, code: String): Future[Option[String]] =
+    session.selectOne(s"select date from ${country}_price where code='${code}").map(_.map(_.getString("data")))
 
   override def insertPrice(country:Country, price: Price): Future[Done] =
     session.executeWrite(s"INSERT INTO ${country}_price (code, date, close, open, low, high, volume) VALUES ('${price.code}', ${price.date}, ${price.close}, ${price.open}, ${price.low}, ${price.high}, ${price.volume}")
@@ -57,12 +57,12 @@ case class StockRepo(session: CassandraSession)(implicit val  ec: ExecutionConte
       _ = prices.map { price =>
         batch.add(stmt.bind
           .setString("code", price.code)
-          .setInt("date", price.date)
-          .setInt("close", price.close)
-          .setInt("open", price.open)
-          .setInt("low", price.low)
-          .setInt("high", price.high)
-          .setLong("volume", price.volume))
+          .setString("date", price.date)
+          .setString("close", price.close)
+          .setString("open", price.open)
+          .setString("low", price.low)
+          .setString("high", price.high)
+          .setString("volume", price.volume))
       }
       r <- session.executeWriteBatch(batch)
     } yield {

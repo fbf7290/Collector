@@ -14,7 +14,7 @@ trait StockRepoTrait[F[_]] {
   def deleteStock(country: Country, stock:Stock):F[Done]
 
   def createPriceTable(country:Country):F[Done]
-  def selectLatestTimestamp(country: Country, code: String):F[Option[Int]]
+  def selectLatestTimestamp(country: Country, code: String):F[Option[String]]
   def insertPrice(country:Country, price:Price):F[Done]
   def insertBatchPrice(country: Country, prices:Seq[Price]):F[Done]
 }

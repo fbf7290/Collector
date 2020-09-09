@@ -19,6 +19,8 @@ import com.asset.collector.impl.Fcm
 import com.asset.collector.impl.Fcm.FcmMessage
 import com.asset.collector.impl.acl.External
 import play.api.libs.json.JsNull
+
+import scala.collection.mutable.ListBuffer
 //import cats.implicits._
 import scala.util.{Failure, Success}
 import cats.syntax.traverse._
@@ -70,14 +72,16 @@ object BatchActor {
                   nowStocks = nowStocksList.foldLeft(Set.empty[Stock])((r, stocks) => r ++ stocks)
                   _ <- refreshStockList(Country.KOREA, nowStocks).run(stockDb)
                 } yield {
-                  Source(nowStocks).mapAsync(8){stock =>
+                  val failList = ListBuffer.empty[String]
+                  Source(nowStocks).mapAsync(1){stock =>
                     println(stock)
-                    External.requestKoreaStockPrice(stock.code).flatMap{ prices =>
+                    External.requestKoreaStockPrice(stock.code)
+                      .flatMap{ prices =>
                       StockRepoAccessor.insertBatchPrice[Future](Country.KOREA, prices).run(stockDb)
-                    }
+                    }.recover{case _ => failList += stock.code}
                   }.runWith(Sink.ignore).onComplete{
-                    case Success(_) => Fcm.sendFcmMsg(List(CollectorSettings.adminFcmRegistrationId), FcmMessage("한국 batch 성공", "1", JsNull))
-                    case Failure(exception) => Fcm.sendFcmMsg(List(CollectorSettings.adminFcmRegistrationId), FcmMessage("한국 batch 성공", exception.getMessage, JsNull))
+                    case Success(_) => Fcm.sendFcmMsg(List(CollectorSettings.adminFcmRegistrationId), FcmMessage("한국 batch 성공", failList.toString, JsNull))
+                    case Failure(exception) => Fcm.sendFcmMsg(List(CollectorSettings.adminFcmRegistrationId), FcmMessage("한국 batch 실패", exception.getMessage, JsNull))
                   }
                 }
               }{
@@ -95,14 +99,17 @@ object BatchActor {
                   nowStocks = nowStocksList.foldLeft(Set.empty[Stock])((r, stocks) => r ++ stocks)
                   _ <- refreshStockList(Country.USA, nowStocks).run(stockDb)
                 } yield {
-                  Source(nowStocks).mapAsync(8){stock =>
+                  val failList = ListBuffer.empty[String]
+                  Source(nowStocks).mapAsync(1){stock =>
                     println(stock)
                     External.requestUsaStockPrice(stock.code).flatMap{ prices =>
                       StockRepoAccessor.insertBatchPrice[Future](Country.USA, prices).run(stockDb)
-                    }
+                    }.recover{case _ => failList += stock.code}
                   }.runWith(Sink.ignore).onComplete{
-                    case Success(_) => Fcm.sendFcmMsg(List(CollectorSettings.adminFcmRegistrationId), FcmMessage("미국 batch 성공", "1", JsNull))
-                    case Failure(exception) => Fcm.sendFcmMsg(List(CollectorSettings.adminFcmRegistrationId), FcmMessage("미국 batch 성공", exception.getMessage, JsNull))
+                    case Success(_) => Fcm.sendFcmMsg(List(CollectorSettings.adminFcmRegistrationId), FcmMessage("미국 batch 성공", failList.toString, JsNull))
+                    case Failure(exception) =>
+                      println(exception)
+                      Fcm.sendFcmMsg(List(CollectorSettings.adminFcmRegistrationId), FcmMessage("미국 batch 실패", exception.getMessage, JsNull))
                   }
                 }
               }{

@@ -56,7 +56,7 @@ object External {
     }
     wsClient.url(s"https://dumbstockapi.com/stock?exchanges=${marketParam}").get.map{
       response =>
-        Json.parse(response.body).as[Seq[DumbStock]].foreach(dumbStock => stockList += Stock(market, dumbStock.name, dumbStock.ticker))
+        Json.parse(response.body).as[Seq[DumbStock]].foreach(dumbStock => stockList += Stock(market, dumbStock.name, dumbStock.ticker.replace("^", "-P")))
         println(response.body)
         stockList.toSeq
     }.recover{case _ => throw ExternalResourceException}
@@ -67,7 +67,7 @@ object External {
       response =>
         val pattern = new scala.util.matching.Regex("<item data=\\\"(.*)\\\" />")
         pattern.findAllIn(response.body).matchData.map(_.group(1).split('|')).toList.filter(_.size==6)
-          .map(arr => Price(code, arr(0).toInt, arr(4).toInt, arr(1).toInt, arr(2).toInt, arr(3).toInt, arr(5).toLong)).toSeq
+          .map(arr => Price(code, arr(0), arr(4), arr(1), arr(2), arr(3), arr(5))).toSeq
     }
 
   def requestUsaStockPrice(code:String, year:Int=30)(implicit ec: ExecutionContext):Future[Seq[Price]] =
@@ -77,7 +77,7 @@ object External {
       val format = new SimpleDateFormat("yyyyMMdd")
       YahooFinance.get(code, from, Interval.DAILY).getHistory.asScala.map{
         stock =>
-          Price(code, format.format(stock.getDate.getTime()).toInt, stock.getClose.intValue, stock.getOpen.intValue, stock.getHigh.intValue, stock.getLow.intValue, stock.getVolume)
+          Price(code, format.format(stock.getDate.getTime()), stock.getClose.toString, stock.getOpen.toString, stock.getHigh.toString, stock.getLow.toString, stock.getVolume.toString)
       }
     }
 }

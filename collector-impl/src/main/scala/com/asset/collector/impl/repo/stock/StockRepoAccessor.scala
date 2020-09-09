@@ -40,8 +40,8 @@ object StockRepoAccessor {
       db => db.createPriceTable(country)
     }
 
-  def selectLatestTimestamp[F[_]:Monad](country:Country, code:String):ReaderT[F, StockRepoTrait[F], Option[Int]] =
-    ReaderT[F, StockRepoTrait[F], Option[Int]] {
+  def selectLatestTimestamp[F[_]:Monad](country:Country, code:String):ReaderT[F, StockRepoTrait[F], Option[String]] =
+    ReaderT[F, StockRepoTrait[F], Option[String]] {
       db => db.selectLatestTimestamp(country, code)
     }
 
