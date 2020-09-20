@@ -5,7 +5,7 @@ import java.util.Calendar
 import akka.actor.ActorSystem
 import akka.{Done, NotUsed}
 import akka.util.Timeout
-import com.asset.collector.api.{CollectorService, Country, Market, NaverEtfListResponse, Price, Stock}
+import com.asset.collector.api.{CollectorService, CollectorSettings, Country, Market, NaverEtfListResponse, NaverStockIndex09, Price, Stock, Test}
 import com.asset.collector.impl.repo.stock.{StockRepo, StockRepoAccessor}
 import com.lightbend.lagom.scaladsl.api.ServiceCall
 import com.lightbend.lagom.scaladsl.api.transport.ResponseHeader
@@ -24,13 +24,16 @@ import com.asset.collector.api.Exception.ExternalResourceException
 import com.asset.collector.api.Market.Market
 import com.asset.collector.impl.acl.External
 import com.lightbend.lagom.internal.persistence.cluster.ClusterStartupTask
-import play.api.libs.json.Json
+import play.api.libs.json.{JsNull, Json}
 import akka.actor.typed.scaladsl.adapter._
 import com.asset.collector.impl.actor.BatchActor
 import akka.actor.typed.scaladsl.AskPattern._
 import akka.stream.Materializer
+import akka.stream.scaladsl.{Sink, Source}
+import com.asset.collector.impl.Fcm.FcmMessage
 
 import scala.concurrent.duration._
+import scala.util.{Failure, Success}
 
 
 class CollectorServiceImpl(val system: ActorSystem, val wsClient: WSClient, val cassandraSession: CassandraSession)
@@ -47,8 +50,15 @@ class CollectorServiceImpl(val system: ActorSystem, val wsClient: WSClient, val 
     (StockRepoAccessor.createStockTable(Country.KOREA).run(stockDb) zip
       StockRepoAccessor.createStockTable(Country.USA).run(stockDb) zip
       StockRepoAccessor.createPriceTable(Country.KOREA).run(stockDb) zip
+      StockRepoAccessor.createStockIndex09Table.run(stockDb) zip
       StockRepoAccessor.createPriceTable(Country.USA).run(stockDb)).map(_ => Done)
   }, 60.seconds, None, 3.seconds, 30.seconds, 0.2)
+
+  override def test: ServiceCall[Test, Done] = ServerServiceCall{
+    (_, a) =>
+      println(a)
+      Future.successful(ResponseHeader.Ok.withStatus(200), Done)
+  }
 
 
   override def getUsaPrice: ServiceCall[NotUsed, Done] =
@@ -79,7 +89,6 @@ class CollectorServiceImpl(val system: ActorSystem, val wsClient: WSClient, val 
 
   override def getKoreaStockList: ServiceCall[NotUsed, Done] =
     ServerServiceCall { (requestHeader, _) =>
-      //http://old.nasdaq.com/screening/companies-by-name.aspx?letter=0&render=download&exchange=NYSE  AMEX  NASDAQ
       wsClient.url("http://kind.krx.co.kr/corpgeneral/corpList.do?method=download&searchType=13&marketType=kospiMkt").get().map {
         response =>
           val a = Jsoup.parseBodyFragment(response.body).body().getElementsByTag("tr")
@@ -93,6 +102,7 @@ class CollectorServiceImpl(val system: ActorSystem, val wsClient: WSClient, val 
           (ResponseHeader.Ok.withStatus(200), Done)
       }
     }
+
 
   override def getUsaStockList: ServiceCall[NotUsed, Done] =
     ServerServiceCall { (requestHeader, _) =>
@@ -161,5 +171,37 @@ class CollectorServiceImpl(val system: ActorSystem, val wsClient: WSClient, val 
   override def requestBatchUsaStock: ServiceCall[NotUsed, Done] = ServerServiceCall { (_, _) =>
     batchActor.ask[BatchActor.Reply.type](reply => BatchActor.CollectUsaStock(Some(reply)))
       .map(_=>(ResponseHeader.Ok.withStatus(200),Done))
+  }
+
+  override def collectNaverStockIndexes: ServiceCall[NotUsed, Done] = ServerServiceCall{ (_,_)=>
+
+    for {
+      stockList <- (External.requestKoreaMarketStockList(Market.KOSPI) zip External.requestKoreaMarketStockList(Market.KOSDAQ)).map(r=>r._2++r._1)
+    }yield{
+      val failList = ListBuffer.empty[String]
+      Source(stockList.toList.zipWithIndex).mapAsync(4){ case (stock, index) =>
+        println(index)
+        println(stock.code)
+        wsClient.url(s"https://finance.naver.com/item/main.nhn?code=${stock.code}").get()
+          .flatMap{ response =>
+            var datas = ListBuffer.empty[NaverStockIndex09]
+            for(i <- List(2,6,7,8,12,13,14,15)){
+              val category = Jsoup.parseBodyFragment(response.body).body().select(s"table.tb_type1_ifrs > tbody > tr:eq(${i}) > th").text.trim
+              val indexes = Jsoup.parseBodyFragment(response.body).body().select(s"table.tb_type1_ifrs > tbody > tr:eq(${i}) > td").asScala.toList.map(_.text.filterNot(_==' ').trim)
+              datas += NaverStockIndex09(stock.code, category, indexes:_*)
+            }
+            StockRepoAccessor.insertBatchStockIndex09(datas.toList).run(stockDb)
+          }.recover{case e =>
+          println(e)
+          failList += stock.code}
+      }.runWith(Sink.ignore).onComplete{
+        case Success(_) =>
+          println(failList)
+          Fcm.sendFcmMsg(List(CollectorSettings.adminFcmRegistrationId), FcmMessage("지표 batch 성공", failList.toString, JsNull))
+        case Failure(exception) => Fcm.sendFcmMsg(List(CollectorSettings.adminFcmRegistrationId), FcmMessage("지표 batch 실패", exception.getMessage, JsNull))
+      }
+    }
+
+    Future.successful((ResponseHeader.Ok.withStatus(200),Done))
   }
 }

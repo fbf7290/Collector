@@ -5,7 +5,7 @@ import cats.Monad
 import cats.data.ReaderT
 import com.asset.collector.api.Country.Country
 import com.asset.collector.api.Market.Market
-import com.asset.collector.api.{Price, Stock}
+import com.asset.collector.api.{NaverStockIndex09, Price, Stock}
 
 object StockRepoAccessor {
 
@@ -54,4 +54,19 @@ object StockRepoAccessor {
     ReaderT[F, StockRepoTrait[F], Done] {
       db => db.insertBatchPrice(country, prices)
     }
+
+  def createStockIndex09Table[F[_]:Monad]:ReaderT[F, StockRepoTrait[F], Done] =
+    ReaderT[F, StockRepoTrait[F], Done] {
+      db => db.createStockIndex09Table
+    }
+  def insertBatchStockIndex09[F[_]:Monad](indexes:Seq[NaverStockIndex09]):ReaderT[F, StockRepoTrait[F], Done] =
+    ReaderT[F, StockRepoTrait[F], Done] {
+      db => db.insertBatchStockIndex09(indexes)
+    }
+  def selectStockIndex09[F[_]:Monad](code:String, category:String):ReaderT[F, StockRepoTrait[F], Option[NaverStockIndex09]] =
+    ReaderT[F, StockRepoTrait[F], Option[NaverStockIndex09]] {
+      db => db.selectStockIndex09(code, category)
+    }
+
+
 }

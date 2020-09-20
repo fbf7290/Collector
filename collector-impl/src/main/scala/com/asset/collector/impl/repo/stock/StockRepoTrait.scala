@@ -3,7 +3,7 @@ package com.asset.collector.impl.repo.stock
 import akka.Done
 import com.asset.collector.api.Country.Country
 import com.asset.collector.api.Market.Market
-import com.asset.collector.api.{Price, Stock}
+import com.asset.collector.api.{NaverStockIndex09, Price, Stock}
 
 
 trait StockRepoTrait[F[_]] {
@@ -17,4 +17,8 @@ trait StockRepoTrait[F[_]] {
   def selectLatestTimestamp(country: Country, code: String):F[Option[String]]
   def insertPrice(country:Country, price:Price):F[Done]
   def insertBatchPrice(country: Country, prices:Seq[Price]):F[Done]
+
+  def createStockIndex09Table:F[Done]
+  def insertBatchStockIndex09(indexes:Seq[NaverStockIndex09]):F[Done]
+  def selectStockIndex09(code:String, category:String):F[Option[NaverStockIndex09]]
 }
